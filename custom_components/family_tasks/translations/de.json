@@ -1,0 +1,95 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Family Tasks",
+        "description": "Fügt ein Punktekonto für die Family Task Card hinzu. Nichts einzurichten: Personen erscheinen mit ihrer ersten Buchung."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "points": {
+        "name": "Punkte"
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Family Tasks ist noch nicht eingerichtet."
+    },
+    "insufficient_points": {
+      "message": "{person} hat {balance} Punkte, die Belohnung kostet {points}."
+    }
+  },
+  "services": {
+    "award": {
+      "name": "Punkte gutschreiben",
+      "description": "Bucht Punkte für eine abgehakte Aufgabe. Ein schon gebuchter Schlüssel wird ignoriert, so können mehrere Geräte dieselbe Aufgabe melden.",
+      "fields": {
+        "key": {
+          "name": "Schlüssel",
+          "description": "Eindeutiger Schlüssel dieser Erledigung."
+        },
+        "person": {
+          "name": "Person",
+          "description": "Wer es gemacht hat (Personen-Entität oder Name)."
+        },
+        "points": {
+          "name": "Punkte",
+          "description": "Punkte für die Aufgabe."
+        },
+        "task": {
+          "name": "Aufgabe",
+          "description": "Name der Aufgabe, für den Verlauf."
+        }
+      }
+    },
+    "revoke": {
+      "name": "Punkte zurücknehmen",
+      "description": "Nimmt die Punkte einer gutgeschriebenen Aufgabe zurück, z. B. wenn der Haken wieder entfernt wurde.",
+      "fields": {
+        "key": {
+          "name": "Schlüssel",
+          "description": "Schlüssel, mit dem die Aufgabe gebucht wurde."
+        }
+      }
+    },
+    "redeem": {
+      "name": "Punkte einlösen",
+      "description": "Gibt Punkte für eine Belohnung aus. Schlägt fehl, wenn die Person zu wenig Punkte hat.",
+      "fields": {
+        "person": {
+          "name": "Person",
+          "description": "Wer einlöst."
+        },
+        "points": {
+          "name": "Punkte",
+          "description": "Was die Belohnung kostet."
+        },
+        "reward": {
+          "name": "Belohnung",
+          "description": "Name der Belohnung, für den Verlauf."
+        }
+      }
+    },
+    "adjust": {
+      "name": "Punkte anpassen",
+      "description": "Gibt einen Bonus (positiv) oder einen Abzug (negativ).",
+      "fields": {
+        "person": {
+          "name": "Person",
+          "description": "Wessen Punkte angepasst werden."
+        },
+        "points": {
+          "name": "Punkte",
+          "description": "Bonus (positiv) oder Abzug (negativ)."
+        },
+        "reason": {
+          "name": "Grund",
+          "description": "Warum, für den Verlauf."
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,69 @@
+award:
+  fields:
+    key:
+      required: true
+      example: "todo.lina|a1b2c3"
+      selector:
+        text:
+    person:
+      required: true
+      example: "person.lina"
+      selector:
+        text:
+    points:
+      required: true
+      example: 10
+      selector:
+        number:
+          min: 0
+          max: 100000
+          mode: box
+    task:
+      example: "Tidy room"
+      selector:
+        text:
+revoke:
+  fields:
+    key:
+      required: true
+      example: "todo.lina|a1b2c3"
+      selector:
+        text:
+redeem:
+  fields:
+    person:
+      required: true
+      example: "person.lina"
+      selector:
+        text:
+    points:
+      required: true
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 100000
+          mode: box
+    reward:
+      example: "30 min tablet"
+      selector:
+        text:
+adjust:
+  fields:
+    person:
+      required: true
+      example: "person.lina"
+      selector:
+        text:
+    points:
+      required: true
+      example: 20
+      selector:
+        number:
+          min: -100000
+          max: 100000
+          mode: box
+    reason:
+      example: "Helped without being asked"
+      selector:
+        text:

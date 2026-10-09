@@ -1,0 +1,95 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Family Tasks",
+        "description": "Adds a points ledger for the Family Task Card. Nothing to set up: people appear with their first booking."
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "points": {
+        "name": "Points"
+      }
+    }
+  },
+  "exceptions": {
+    "not_loaded": {
+      "message": "Family Tasks is not set up yet."
+    },
+    "insufficient_points": {
+      "message": "{person} has {balance} points, the reward costs {points}."
+    }
+  },
+  "services": {
+    "award": {
+      "name": "Award points",
+      "description": "Books points for a checked-off task. A key that was already booked is ignored, so several devices can report the same task.",
+      "fields": {
+        "key": {
+          "name": "Key",
+          "description": "Unique key of this task completion."
+        },
+        "person": {
+          "name": "Person",
+          "description": "Who did it (person entity or name)."
+        },
+        "points": {
+          "name": "Points",
+          "description": "Points for the task."
+        },
+        "task": {
+          "name": "Task",
+          "description": "Task name, for the history."
+        }
+      }
+    },
+    "revoke": {
+      "name": "Revoke points",
+      "description": "Takes the points of an awarded task back, e.g. when it was unchecked.",
+      "fields": {
+        "key": {
+          "name": "Key",
+          "description": "Key the task was awarded with."
+        }
+      }
+    },
+    "redeem": {
+      "name": "Redeem points",
+      "description": "Spends points on a reward. Fails when the person has too few points.",
+      "fields": {
+        "person": {
+          "name": "Person",
+          "description": "Who redeems."
+        },
+        "points": {
+          "name": "Points",
+          "description": "What the reward costs."
+        },
+        "reward": {
+          "name": "Reward",
+          "description": "Reward name, for the history."
+        }
+      }
+    },
+    "adjust": {
+      "name": "Adjust points",
+      "description": "Gives a bonus (positive) or a deduction (negative).",
+      "fields": {
+        "person": {
+          "name": "Person",
+          "description": "Whose points to adjust."
+        },
+        "points": {
+          "name": "Points",
+          "description": "Bonus (positive) or deduction (negative)."
+        },
+        "reason": {
+          "name": "Reason",
+          "description": "Why, for the history."
+        }
+      }
+    }
+  }
+}

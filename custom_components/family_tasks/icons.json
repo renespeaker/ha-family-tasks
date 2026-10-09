@@ -1,0 +1,13 @@
+{
+  "entity": {
+    "sensor": {
+      "points": { "default": "mdi:star-circle" }
+    }
+  },
+  "services": {
+    "award": { "service": "mdi:star-plus" },
+    "revoke": { "service": "mdi:star-minus" },
+    "redeem": { "service": "mdi:gift" },
+    "adjust": { "service": "mdi:plus-minus-variant" }
+  }
+}

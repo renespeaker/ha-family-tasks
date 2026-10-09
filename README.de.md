@@ -1,0 +1,95 @@
+# ⭐ Family Tasks
+
+> 🌐 **Deutsch** (diese Seite) · [English](README.md)
+
+![Family-Tasks-Icon](custom_components/family_tasks/brand/icon.png)
+
+Ein **dauerhaftes Punktekonto** für die
+[Family Task Card](https://github.com/renespeaker/ha-family-task-card) in
+[Home Assistant](https://www.home-assistant.io/). Ohne sie berechnet die Karte
+Punkte live aus den abgehakten Aufgaben – einfach, aber Punkte verschwinden,
+wenn eine Liste geleert wird, und Ämtli, die jede Runde wieder öffnen, können
+keine bekommen. Mit Family Tasks wird **jeder Punkt gebucht und bleibt**, und jede
+Person bekommt einen Punkte-Sensor.
+
+> **Stand: v0.1.0 – Phase 1 (Punktekonto).** Die Unterstützung in der Karte folgt
+> in der Family Task Card. Als Nächstes geplant: Belohnungs-Freigabe per Push,
+> Statistik.
+
+## Was du bekommst
+
+- **Einen Punkte-Sensor pro Person**, z. B. `sensor.lina_punkte` – ausgebbare Punkte
+  als Zustand, dazu `earned` (verdient) und `redeemed` (eingelöst). Funktioniert
+  mit Verlauf, Statistik und Automationen.
+- **Buchungen, die nie doppelt zählen.** Jede Gutschrift hat einen eindeutigen
+  Schlüssel (die Karte nimmt Liste + Aufgabe, bei Ämtli zusätzlich die Runde).
+  Melden Handy und Wandtablet dieselbe Aufgabe, wird sie einmal gebucht.
+- **Dienste** für die Karte und eigene Automationen:
+
+  | Dienst | Was er tut |
+  |---|---|
+  | `family_tasks.award` | Punkte für eine Aufgabe buchen (`key`, `person`, `points`, `task`) |
+  | `family_tasks.revoke` | Gutschrift zurücknehmen, z. B. wenn der Haken entfernt wird (`key`) |
+  | `family_tasks.redeem` | Punkte für eine Belohnung ausgeben; lehnt ab, wenn es zu wenige sind (`person`, `points`, `reward`) |
+  | `family_tasks.adjust` | Bonus (positiv) oder Abzug (negativ) durch die Eltern (`person`, `points`, `reason`) |
+
+  Alle liefern den neuen Kontostand zurück (`return_response`).
+- **Ein Ereignis** `family_tasks_points_changed` bei jeder Buchung – z. B. um ein
+  Licht blinken zu lassen, wenn jemand Punkte bekommt.
+- Gespeichert in Home Assistant selbst (`.storage/family_tasks`), keine Cloud,
+  nichts einzustellen.
+
+## Installation
+
+### Über HACS (benutzerdefiniertes Repository)
+
+1. HACS → ⋮ → **Benutzerdefinierte Repositories** →
+   `https://github.com/renespeaker/ha-family-tasks` hinzufügen, Typ **Integration**.
+2. Nach **Family Tasks** suchen → **Herunterladen** → Home Assistant neu starten.
+3. **Einstellungen → Geräte & Dienste → Integration hinzufügen → Family Tasks** →
+   Absenden. Es gibt nichts auszufüllen.
+
+Personen erscheinen mit ihrer ersten Buchung. Nimm die `person.*`-Entität als
+`person` (z. B. `person.lina`), dann heißt das Gerät wie die Person.
+
+### Manuell
+
+`custom_components/family_tasks` nach `config/custom_components/` kopieren, neu
+starten und die Integration wie oben hinzufügen.
+
+## Beispiele
+
+```yaml
+# Bonus fürs Helfen ohne Aufforderung
+action: family_tasks.adjust
+data:
+  person: person.lina
+  points: 20
+  reason: Ohne Aufforderung geholfen
+```
+
+```yaml
+# Kinderzimmer-Licht bei jeder Buchung für Lina grün blinken lassen
+triggers:
+  - trigger: event
+    event_type: family_tasks_points_changed
+    event_data:
+      person: person.lina
+actions:
+  - action: light.turn_on
+    target: { entity_id: light.kinderzimmer }
+    data: { rgb_color: [0, 255, 0], flash: short }
+```
+
+## Entwicklung
+
+```bash
+uv venv -p 3.13 .venv
+uv pip install -p .venv/bin/python -r requirements_test.txt
+.venv/bin/python -m pytest -q
+uvx ruff check . && uvx ruff format --check .
+```
+
+## Lizenz
+
+MIT

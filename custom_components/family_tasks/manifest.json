@@ -1,0 +1,13 @@
+{
+  "domain": "family_tasks",
+  "name": "Family Tasks",
+  "codeowners": ["@renespeaker"],
+  "config_flow": true,
+  "documentation": "https://github.com/renespeaker/ha-family-tasks",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/renespeaker/ha-family-tasks/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "0.1.0"
+}
