@@ -85,7 +85,7 @@ actions:
 uv venv -p 3.13 .venv
 uv pip install -p .venv/bin/python -r requirements_test.txt
 .venv/bin/python -m pytest -q
-uvx ruff check . && uvx ruff format --check .
+uvx ruff@0.16.10 check . && uvx ruff@0.16.10 format --check .
 ```
 
 ## License
