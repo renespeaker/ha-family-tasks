@@ -90,6 +90,55 @@
           "description": "Warum, für den Verlauf."
         }
       }
+    },
+    "request_reward": {
+      "name": "Belohnung anfragen",
+      "description": "Ein Kind fragt eine Belohnung an: Die Punkte werden reserviert, und die Eltern bekommen eine Push-Nachricht mit „Freigeben“ / „Ablehnen“. Schlägt fehl, wenn es zu wenig Punkte sind.",
+      "fields": {
+        "person": {
+          "name": "Person",
+          "description": "Wer anfragt."
+        },
+        "points": {
+          "name": "Punkte",
+          "description": "Was die Belohnung kostet."
+        },
+        "reward": {
+          "name": "Belohnung",
+          "description": "Name der Belohnung."
+        }
+      }
+    },
+    "approve": {
+      "name": "Belohnung freigeben",
+      "description": "Gibt eine Belohnungs-Anfrage frei: Die reservierten Punkte werden ausgegeben.",
+      "fields": {
+        "request_id": {
+          "name": "Anfrage-ID",
+          "description": "ID der Anfrage."
+        }
+      }
+    },
+    "deny": {
+      "name": "Belohnung ablehnen",
+      "description": "Lehnt eine Belohnungs-Anfrage ab: Die reservierten Punkte sind wieder frei.",
+      "fields": {
+        "request_id": {
+          "name": "Anfrage-ID",
+          "description": "ID der Anfrage."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Belohnungs-Freigabe",
+        "description": "Wer bekommt eine Push-Nachricht, um eine Belohnungs-Anfrage freizugeben oder abzulehnen? Wähle die Benachrichtigungsdienste der Eltern-Handys (Home-Assistant-Companion-App).",
+        "data": {
+          "notify": "Push an"
+        }
+      }
     }
   }
 }

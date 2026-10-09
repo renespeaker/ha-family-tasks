@@ -11,13 +11,14 @@ points live from checked-off tasks — simple, but points disappear when a list 
 cleared, and chores that reopen every round can't earn any. With Family Tasks,
 **every point is booked and kept**, and each person gets a points sensor.
 
-> **Status: v0.1.0 — phase 1 (points ledger).** Card support follows in the
-> Family Task Card. Planned next: reward approval by push, statistics.
+> **Status: v0.2.0 — points ledger + reward approval by push.** Use it with the
+> Family Task Card v0.14.0 or newer (`points_backend: true`). Planned next:
+> statistics.
 
 ## What you get
 
 - **A points sensor per person**, e.g. `sensor.lina_points` — spendable points as
-  the state, plus `earned` and `redeemed`. Works with history graphs,
+  the state, plus `earned`, `redeemed`, `reserved` and `pending` requests. Works with history graphs,
   statistics and automations.
 - **Bookings that never count twice.** Every award has a unique key (the card uses
   list + task, plus the round for rotating chores). When phone and wall tablet
@@ -30,12 +31,35 @@ cleared, and chores that reopen every round can't earn any. With Family Tasks,
   | `family_tasks.revoke` | take an award back, e.g. when a task is unchecked (`key`) |
   | `family_tasks.redeem` | spend points on a reward; refuses if there are too few (`person`, `points`, `reward`) |
   | `family_tasks.adjust` | bonus (positive) or deduction (negative) by a parent (`person`, `points`, `reason`) |
+  | `family_tasks.request_reward` | a child asks for a reward: points are reserved, parents get a push (`person`, `points`, `reward`) |
+  | `family_tasks.approve` / `deny` | decide a request (`request_id`) — or tap the button in the push |
 
   All return the new balance (`return_response`).
 - **An event** `family_tasks_points_changed` for every booking — e.g. to flash a
   light when someone earns points.
 - Stored inside Home Assistant (`.storage/family_tasks`), no cloud, nothing to
   configure.
+
+## Reward approval by push
+
+A child asks for a reward (`family_tasks.request_reward`, or the card with
+*reward approval* switched on). The points are **reserved** at once — nobody can
+ask for more than is left — and the parents get a **push with "Approve" /
+"Deny"** on their phones:
+
+- **Approve** spends the reserved points, **Deny** frees them again.
+- Only the first decision counts; the push then disappears from the other
+  parents' phones too.
+- Open requests are kept across restarts and show up in the sensor
+  (`reserved`, `pending`).
+
+**Who gets the push:** Settings → Devices & services → Family Tasks →
+**Configure** → pick the notify services of the parents' phones
+(`notify.mobile_app_…`, from the Home Assistant Companion app). Without a target,
+requests can still be decided with `family_tasks.approve` / `deny`.
+
+Events for your own automations: `family_tasks_reward_requested` and
+`family_tasks_reward_decided` (with `approved: true/false`).
 
 ## Installation
 

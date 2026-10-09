@@ -12,14 +12,15 @@ wenn eine Liste geleert wird, und Ämtli, die jede Runde wieder öffnen, können
 keine bekommen. Mit Family Tasks wird **jeder Punkt gebucht und bleibt**, und jede
 Person bekommt einen Punkte-Sensor.
 
-> **Stand: v0.1.0 – Phase 1 (Punktekonto).** Die Unterstützung in der Karte folgt
-> in der Family Task Card. Als Nächstes geplant: Belohnungs-Freigabe per Push,
-> Statistik.
+> **Stand: v0.2.0 – Punktekonto + Belohnungs-Freigabe per Push.** Zusammen mit
+> der Family Task Card ab v0.14.0 nutzen (`points_backend: true`). Als Nächstes
+> geplant: Statistik.
 
 ## Was du bekommst
 
 - **Einen Punkte-Sensor pro Person**, z. B. `sensor.lina_punkte` – ausgebbare Punkte
-  als Zustand, dazu `earned` (verdient) und `redeemed` (eingelöst). Funktioniert
+  als Zustand, dazu `earned` (verdient), `redeemed` (eingelöst), `reserved`
+  (reserviert) und offene Anfragen (`pending`). Funktioniert
   mit Verlauf, Statistik und Automationen.
 - **Buchungen, die nie doppelt zählen.** Jede Gutschrift hat einen eindeutigen
   Schlüssel (die Karte nimmt Liste + Aufgabe, bei Ämtli zusätzlich die Runde).
@@ -32,12 +33,35 @@ Person bekommt einen Punkte-Sensor.
   | `family_tasks.revoke` | Gutschrift zurücknehmen, z. B. wenn der Haken entfernt wird (`key`) |
   | `family_tasks.redeem` | Punkte für eine Belohnung ausgeben; lehnt ab, wenn es zu wenige sind (`person`, `points`, `reward`) |
   | `family_tasks.adjust` | Bonus (positiv) oder Abzug (negativ) durch die Eltern (`person`, `points`, `reason`) |
+  | `family_tasks.request_reward` | Kind fragt eine Belohnung an: Punkte werden reserviert, Eltern bekommen eine Push (`person`, `points`, `reward`) |
+  | `family_tasks.approve` / `deny` | Anfrage entscheiden (`request_id`) – oder den Knopf in der Push antippen |
 
   Alle liefern den neuen Kontostand zurück (`return_response`).
 - **Ein Ereignis** `family_tasks_points_changed` bei jeder Buchung – z. B. um ein
   Licht blinken zu lassen, wenn jemand Punkte bekommt.
 - Gespeichert in Home Assistant selbst (`.storage/family_tasks`), keine Cloud,
   nichts einzustellen.
+
+## Belohnungs-Freigabe per Push
+
+Ein Kind fragt eine Belohnung an (`family_tasks.request_reward`, oder die Karte
+mit eingeschalteter *Belohnungs-Freigabe*). Die Punkte werden sofort
+**reserviert** – niemand kann mehr anfragen, als übrig ist – und die Eltern
+bekommen eine **Push-Nachricht mit „Freigeben" / „Ablehnen"** aufs Handy:
+
+- **Freigeben** gibt die reservierten Punkte aus, **Ablehnen** gibt sie wieder frei.
+- Nur die erste Entscheidung zählt; danach verschwindet die Push auch von den
+  Handys der anderen Eltern.
+- Offene Anfragen überstehen Neustarts und stehen im Sensor (`reserved`,
+  `pending`).
+
+**Wer die Push bekommt:** Einstellungen → Geräte & Dienste → Family Tasks →
+**Konfigurieren** → die Benachrichtigungsdienste der Eltern-Handys wählen
+(`notify.mobile_app_…`, aus der Home-Assistant-Companion-App). Ohne Ziel lassen
+sich Anfragen trotzdem mit `family_tasks.approve` / `deny` entscheiden.
+
+Ereignisse für eigene Automationen: `family_tasks_reward_requested` und
+`family_tasks_reward_decided` (mit `approved: true/false`).
 
 ## Installation
 
