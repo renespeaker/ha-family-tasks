@@ -11,9 +11,8 @@ points live from checked-off tasks — simple, but points disappear when a list 
 cleared, and chores that reopen every round can't earn any. With Family Tasks,
 **every point is booked and kept**, and each person gets a points sensor.
 
-> **Status: v0.2.0 — points ledger + reward approval by push.** Use it with the
-> Family Task Card v0.14.0 or newer (`points_backend: true`). Planned next:
-> statistics.
+> **Status: v0.3.0 — points ledger, reward approval by push, statistics.** Use it
+> with the Family Task Card v0.14.0 or newer (`points_backend: true`).
 
 ## What you get
 
@@ -60,6 +59,20 @@ requests can still be decided with `family_tasks.approve` / `deny`.
 
 Events for your own automations: `family_tasks_reward_requested` and
 `family_tasks_reward_decided` (with `approved: true/false`).
+
+## Statistics
+
+Every points sensor also counts, in Home Assistant's time zone:
+
+| Attribute | Meaning |
+|---|---|
+| `week_points` / `week_tasks` | points earned / tasks done this week (from Monday) |
+| `month_points` / `month_tasks` | the same for this calendar month |
+| `streak` | days in a row with at least one task, up to today (or yesterday, until today's first task) |
+| `best_streak` | the longest run so far |
+
+The numbers roll over by themselves just after midnight. A task counts on the
+day it is booked — the card books a task when it sees it checked off.
 
 ## Installation
 

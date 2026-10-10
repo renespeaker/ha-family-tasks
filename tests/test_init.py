@@ -116,3 +116,36 @@ async def test_person_entity_names_the_device(hass: HomeAssistant):
     await _setup(hass)
     await _call(hass, "award", key="a", person="person.lina", points=10)
     assert _sensor(hass, "person.lina").entity_id == "sensor.lina_points"
+
+
+async def test_sensor_counts_week_month_and_streak(hass: HomeAssistant, freezer):
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    await _setup(hass)
+    # Mon, Tue, Wed of the week of 12 Oct 2026, late evening in Berlin
+    for i, day in enumerate((12, 13, 14)):
+        freezer.move_to(f"2026-10-{day}T21:30:00+02:00")
+        await _call(hass, "award", key=f"t{i}", person="Lina", points=10)
+    a = _sensor(hass, "Lina").attributes
+    assert (a["week_points"], a["week_tasks"], a["month_tasks"]) == (30, 3, 3)
+    assert (a["streak"], a["best_streak"]) == (3, 3)
+
+
+async def test_midnight_ends_a_broken_streak(hass: HomeAssistant, freezer):
+    from pytest_homeassistant_custom_component.common import async_fire_time_changed
+
+    await hass.config.async_set_time_zone("Europe/Berlin")
+    await _setup(hass)
+    freezer.move_to("2026-10-13T18:00:00+02:00")
+    await _call(hass, "award", key="a", person="Lina", points=10)
+    assert _sensor(hass, "Lina").attributes["streak"] == 1
+    # Late Wednesday: Tuesday was the last task, the streak still stands
+    freezer.move_to("2026-10-14T23:30:00+02:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    assert _sensor(hass, "Lina").attributes["streak"] == 1
+    # Just after midnight: Wednesday was missed, the sensor recounts by itself
+    freezer.move_to("2026-10-15T00:00:05+02:00")
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done()
+    a = _sensor(hass, "Lina").attributes
+    assert (a["streak"], a["best_streak"], a["week_tasks"]) == (0, 1, 1)
