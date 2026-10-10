@@ -67,3 +67,36 @@ adjust:
       example: "Helped without being asked"
       selector:
         text:
+request_reward:
+  fields:
+    person:
+      required: true
+      example: "person.lina"
+      selector:
+        text:
+    points:
+      required: true
+      example: 50
+      selector:
+        number:
+          min: 1
+          max: 100000
+          mode: box
+    reward:
+      example: "30 min tablet"
+      selector:
+        text:
+approve:
+  fields:
+    request_id:
+      required: true
+      example: "01J9Z6Q0Q8M2V3W4X5Y6Z7A8B9"
+      selector:
+        text:
+deny:
+  fields:
+    request_id:
+      required: true
+      example: "01J9Z6Q0Q8M2V3W4X5Y6Z7A8B9"
+      selector:
+        text:

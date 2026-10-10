@@ -67,3 +67,43 @@ def test_rejects_nonsense():
         led.award("a", "Lina", -1, "", T)
     with pytest.raises(ValueError):
         led.redeem("Lina", 0, "", T)
+
+
+def test_a_request_reserves_points_until_decided():
+    led = Ledger()
+    led.award("a", "Lina", 30, "", T)
+    led.request("r1", "Lina", 20, "Ice cream", T)
+    assert (led.totals("Lina").balance, led.reserved("Lina"), led.available("Lina")) == (30, 20, 10)
+    with pytest.raises(InsufficientPoints):
+        led.request("r2", "Lina", 15, "Tablet", T)  # only 10 left to ask for
+    with pytest.raises(InsufficientPoints):
+        led.redeem("Lina", 15, "Tablet", T)
+
+
+def test_approve_spends_the_reserved_points():
+    led = Ledger()
+    led.award("a", "Lina", 30, "", T)
+    led.request("r1", "Lina", 20, "Ice cream", T)
+    assert led.approve("r1", T).label == "Ice cream"
+    assert (led.totals("Lina").redeemed, led.available("Lina"), led.pending("Lina")) == (20, 10, [])
+    assert led.approve("r1", T) is None  # the second parent's tap does nothing
+
+
+def test_deny_frees_the_points_again():
+    led = Ledger()
+    led.award("a", "Lina", 30, "", T)
+    led.request("r1", "Lina", 20, "Ice cream", T)
+    assert led.deny("r1").points == 20
+    assert (led.totals("Lina").redeemed, led.available("Lina")) == (0, 30)
+    assert led.deny("r1") is None
+
+
+def test_pending_requests_survive_storage():
+    led = Ledger()
+    led.award("a", "Lina", 30, "", T)
+    led.request("r1", "Lina", 20, "Ice cream", T)
+    again = Ledger.from_dict(led.as_dict())
+    assert again.pending("Lina")[0].id == "r1"
+    assert again.available("Lina") == 10
+    # a v0.1 store without requests still loads
+    assert Ledger.from_dict({"bookings": []}).requests == []

@@ -90,6 +90,55 @@
           "description": "Why, for the history."
         }
       }
+    },
+    "request_reward": {
+      "name": "Request a reward",
+      "description": "A child asks for a reward: its points are reserved and the parents get a push with “approve” / “deny”. Fails when there are too few points.",
+      "fields": {
+        "person": {
+          "name": "Person",
+          "description": "Who asks."
+        },
+        "points": {
+          "name": "Points",
+          "description": "What the reward costs."
+        },
+        "reward": {
+          "name": "Reward",
+          "description": "Reward name."
+        }
+      }
+    },
+    "approve": {
+      "name": "Approve a reward",
+      "description": "Says yes to a reward request: the reserved points are spent.",
+      "fields": {
+        "request_id": {
+          "name": "Request ID",
+          "description": "ID of the request."
+        }
+      }
+    },
+    "deny": {
+      "name": "Deny a reward",
+      "description": "Says no to a reward request: the reserved points are free again.",
+      "fields": {
+        "request_id": {
+          "name": "Request ID",
+          "description": "ID of the request."
+        }
+      }
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Reward approval",
+        "description": "Who gets a push to approve or deny a reward request? Pick the notify services of the parents' phones (Home Assistant Companion app).",
+        "data": {
+          "notify": "Push to"
+        }
+      }
     }
   }
 }

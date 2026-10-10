@@ -2,7 +2,10 @@
 
 The card reports checked-off tasks with `family_tasks.award` (and takes them
 back with `revoke`); rewards are paid with `redeem`, parents can give a bonus
-or deduction with `adjust`. Every person gets a points sensor.
+or deduction with `adjust`. With `request_reward` a child asks for a reward:
+its points are reserved and the parents get a push with "approve" / "deny"
+buttons (or decide with the `approve` / `deny` services). Every person gets a
+points sensor.
 """
 
 from __future__ import annotations
@@ -13,6 +16,7 @@ import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import (
+    Event,
     HomeAssistant,
     ServiceCall,
     ServiceResponse,
@@ -25,41 +29,53 @@ from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.util import dt as dt_util
+from homeassistant.util.ulid import ulid_now
 
 from .const import (
+    ACTION_APPROVE,
+    ACTION_DENY,
     ATTR_KEY,
     ATTR_PERSON,
     ATTR_POINTS,
     ATTR_REASON,
+    ATTR_REQUEST_ID,
     ATTR_REWARD,
     ATTR_TASK,
+    CONF_NOTIFY,
     DOMAIN,
+    EVENT_NOTIFICATION_ACTION,
     EVENT_POINTS_CHANGED,
+    EVENT_REWARD_DECIDED,
+    EVENT_REWARD_REQUESTED,
     SERVICE_ADJUST,
+    SERVICE_APPROVE,
     SERVICE_AWARD,
+    SERVICE_DENY,
     SERVICE_REDEEM,
+    SERVICE_REQUEST_REWARD,
     SERVICE_REVOKE,
     SIGNAL_UPDATED,
     STORAGE_KEY,
     STORAGE_VERSION,
 )
-from .ledger import InsufficientPoints, Ledger
+from .ledger import InsufficientPoints, Ledger, Request
 
 PLATFORMS = [Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 PERSON = vol.All(cv.string, vol.Length(min=1))
+KEY = vol.All(cv.string, vol.Length(min=1))
 
 AWARD_SCHEMA = vol.Schema(
     {
-        vol.Required(ATTR_KEY): vol.All(cv.string, vol.Length(min=1)),
+        vol.Required(ATTR_KEY): KEY,
         vol.Required(ATTR_PERSON): PERSON,
         vol.Required(ATTR_POINTS): vol.All(vol.Coerce(int), vol.Range(min=0)),
         vol.Optional(ATTR_TASK, default=""): cv.string,
     }
 )
-REVOKE_SCHEMA = vol.Schema({vol.Required(ATTR_KEY): vol.All(cv.string, vol.Length(min=1))})
-REDEEM_SCHEMA = vol.Schema(
+REVOKE_SCHEMA = vol.Schema({vol.Required(ATTR_KEY): KEY})
+REWARD_SCHEMA = vol.Schema(
     {
         vol.Required(ATTR_PERSON): PERSON,
         vol.Required(ATTR_POINTS): vol.All(vol.Coerce(int), vol.Range(min=1)),
@@ -73,6 +89,23 @@ ADJUST_SCHEMA = vol.Schema(
         vol.Optional(ATTR_REASON, default=""): cv.string,
     }
 )
+DECIDE_SCHEMA = vol.Schema({vol.Required(ATTR_REQUEST_ID): KEY})
+
+# Push texts, by Home Assistant language (English otherwise).
+PUSH_TEXT = {
+    "de": {
+        "title": "🎁 Belohnung angefragt",
+        "message": "{person} möchte „{reward}“ für {points} Punkte.",
+        "approve": "Freigeben",
+        "deny": "Ablehnen",
+    },
+    "en": {
+        "title": "🎁 Reward requested",
+        "message": "{person} would like “{reward}” for {points} points.",
+        "approve": "Approve",
+        "deny": "Deny",
+    },
+}
 
 
 @dataclass
@@ -86,47 +119,134 @@ class FamilyTasksData:
 type FamilyTasksConfigEntry = ConfigEntry[FamilyTasksData]
 
 
+def _now() -> str:
+    return dt_util.utcnow().isoformat()
+
+
+def _loaded_entry(hass: HomeAssistant) -> FamilyTasksConfigEntry:
+    entries = hass.config_entries.async_loaded_entries(DOMAIN)
+    if not entries:
+        raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
+    return entries[0]
+
+
+def _display_name(hass: HomeAssistant, person: str) -> str:
+    """Use the person entity's friendly name when the key is a person.*."""
+    if person.startswith("person.") and (state := hass.states.get(person)):
+        return str(state.attributes.get("friendly_name", person))
+    return person
+
+
+@callback
+def _changed(
+    hass: HomeAssistant, data: FamilyTasksData, person: str, kind: str, points: int, label: str
+) -> None:
+    """Save, refresh the person's sensor and tell automations."""
+    data.store.async_delay_save(data.ledger.as_dict, 1)
+    async_dispatcher_send(hass, SIGNAL_UPDATED, person)
+    hass.bus.async_fire(
+        EVENT_POINTS_CHANGED,
+        {
+            "person": person,
+            "kind": kind,
+            "points": points,
+            "label": label,
+            "balance": data.ledger.totals(person).balance,
+        },
+    )
+
+
+def _insufficient(person: str, err: InsufficientPoints, points: int) -> ServiceValidationError:
+    return ServiceValidationError(
+        translation_domain=DOMAIN,
+        translation_key="insufficient_points",
+        translation_placeholders={
+            "person": person,
+            "balance": str(err.balance),
+            "points": str(points),
+        },
+    )
+
+
+async def _push(hass: HomeAssistant, entry: FamilyTasksConfigEntry, req: Request) -> None:
+    """Ask the parents: an actionable notification to every configured target."""
+    text = PUSH_TEXT.get(hass.config.language.split("-")[0], PUSH_TEXT["en"])
+    message = text["message"].format(
+        person=_display_name(hass, req.person), reward=req.label or "?", points=req.points
+    )
+    payload = {
+        "title": text["title"],
+        "message": message,
+        "data": {
+            "tag": f"{DOMAIN}_{req.id}",
+            "actions": [
+                {"action": f"{ACTION_APPROVE}{req.id}", "title": text["approve"]},
+                {"action": f"{ACTION_DENY}{req.id}", "title": text["deny"]},
+            ],
+        },
+    }
+    for target in entry.options.get(CONF_NOTIFY, []):
+        await hass.services.async_call("notify", target, payload, blocking=False)
+
+
+async def _clear_push(hass: HomeAssistant, entry: FamilyTasksConfigEntry, request_id: str) -> None:
+    """Remove the request's push from every parent's phone once it is decided."""
+    for target in entry.options.get(CONF_NOTIFY, []):
+        await hass.services.async_call(
+            "notify",
+            target,
+            {"message": "clear_notification", "data": {"tag": f"{DOMAIN}_{request_id}"}},
+            blocking=False,
+        )
+
+
+async def _decide(
+    hass: HomeAssistant, entry: FamilyTasksConfigEntry, request_id: str, approve: bool
+) -> Request | None:
+    """Approve or deny a request; None if it was already decided (or unknown)."""
+    data = entry.runtime_data
+    req = data.ledger.approve(request_id, _now()) if approve else data.ledger.deny(request_id)
+    if req is None:
+        return None
+    if approve:
+        _changed(hass, data, req.person, "redeem", -req.points, req.label)
+    else:
+        data.store.async_delay_save(data.ledger.as_dict, 1)
+        async_dispatcher_send(hass, SIGNAL_UPDATED, req.person)
+    hass.bus.async_fire(
+        EVENT_REWARD_DECIDED,
+        {
+            "request_id": req.id,
+            "person": req.person,
+            "reward": req.label,
+            "points": req.points,
+            "approved": approve,
+        },
+    )
+    await _clear_push(hass, entry, req.id)
+    return req
+
+
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     """Register the services (they look up the loaded entry when called)."""
 
-    def _data() -> FamilyTasksData:
-        entries = hass.config_entries.async_loaded_entries(DOMAIN)
-        if not entries:
-            raise ServiceValidationError(translation_domain=DOMAIN, translation_key="not_loaded")
-        return entries[0].runtime_data
-
-    @callback
-    def _changed(data: FamilyTasksData, person: str, kind: str, points: int, label: str) -> None:
-        data.store.async_delay_save(data.ledger.as_dict, 1)
-        async_dispatcher_send(hass, SIGNAL_UPDATED, person)
-        hass.bus.async_fire(
-            EVENT_POINTS_CHANGED,
-            {
-                "person": person,
-                "kind": kind,
-                "points": points,
-                "label": label,
-                "balance": data.ledger.totals(person).balance,
-            },
-        )
-
     async def award(call: ServiceCall) -> ServiceResponse:
-        data = _data()
+        data = _loaded_entry(hass).runtime_data
         person, points, task = call.data[ATTR_PERSON], call.data[ATTR_POINTS], call.data[ATTR_TASK]
         booked = data.ledger.award(call.data[ATTR_KEY], person, points, task, _now())
         if booked:
-            _changed(data, person, "award", points, task)
+            _changed(hass, data, person, "award", points, task)
         return {"awarded": booked, "balance": data.ledger.totals(person).balance}
 
     async def revoke(call: ServiceCall) -> ServiceResponse:
-        data = _data()
+        data = _loaded_entry(hass).runtime_data
         gone = data.ledger.revoke(call.data[ATTR_KEY])
         if gone:
-            _changed(data, gone.person, "revoke", -gone.points, gone.label)
+            _changed(hass, data, gone.person, "revoke", -gone.points, gone.label)
         return {"revoked": gone is not None}
 
     async def redeem(call: ServiceCall) -> ServiceResponse:
-        data = _data()
+        data = _loaded_entry(hass).runtime_data
         person, points, reward = (
             call.data[ATTR_PERSON],
             call.data[ATTR_POINTS],
@@ -135,34 +255,58 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         try:
             data.ledger.redeem(person, points, reward, _now())
         except InsufficientPoints as err:
-            raise ServiceValidationError(
-                translation_domain=DOMAIN,
-                translation_key="insufficient_points",
-                translation_placeholders={
-                    "person": person,
-                    "balance": str(err.balance),
-                    "points": str(points),
-                },
-            ) from err
-        _changed(data, person, "redeem", -points, reward)
+            raise _insufficient(person, err, points) from err
+        _changed(hass, data, person, "redeem", -points, reward)
         return {"balance": data.ledger.totals(person).balance}
 
     async def adjust(call: ServiceCall) -> ServiceResponse:
-        data = _data()
+        data = _loaded_entry(hass).runtime_data
         person, points, reason = (
             call.data[ATTR_PERSON],
             call.data[ATTR_POINTS],
             call.data[ATTR_REASON],
         )
         data.ledger.adjust(person, points, reason, _now())
-        _changed(data, person, "adjust", points, reason)
+        _changed(hass, data, person, "adjust", points, reason)
         return {"balance": data.ledger.totals(person).balance}
+
+    async def request_reward(call: ServiceCall) -> ServiceResponse:
+        entry = _loaded_entry(hass)
+        data = entry.runtime_data
+        person, points, reward = (
+            call.data[ATTR_PERSON],
+            call.data[ATTR_POINTS],
+            call.data[ATTR_REWARD],
+        )
+        try:
+            req = data.ledger.request(ulid_now(), person, points, reward, _now())
+        except InsufficientPoints as err:
+            raise _insufficient(person, err, points) from err
+        data.store.async_delay_save(data.ledger.as_dict, 1)
+        async_dispatcher_send(hass, SIGNAL_UPDATED, person)
+        hass.bus.async_fire(
+            EVENT_REWARD_REQUESTED,
+            {"request_id": req.id, "person": person, "reward": reward, "points": points},
+        )
+        await _push(hass, entry, req)
+        return {"request_id": req.id, "available": data.ledger.available(person)}
+
+    async def approve(call: ServiceCall) -> ServiceResponse:
+        req = await _decide(hass, _loaded_entry(hass), call.data[ATTR_REQUEST_ID], True)
+        return {"decided": req is not None}
+
+    async def deny(call: ServiceCall) -> ServiceResponse:
+        req = await _decide(hass, _loaded_entry(hass), call.data[ATTR_REQUEST_ID], False)
+        return {"decided": req is not None}
 
     for name, handler, schema in (
         (SERVICE_AWARD, award, AWARD_SCHEMA),
         (SERVICE_REVOKE, revoke, REVOKE_SCHEMA),
-        (SERVICE_REDEEM, redeem, REDEEM_SCHEMA),
+        (SERVICE_REDEEM, redeem, REWARD_SCHEMA),
         (SERVICE_ADJUST, adjust, ADJUST_SCHEMA),
+        (SERVICE_REQUEST_REWARD, request_reward, REWARD_SCHEMA),
+        (SERVICE_APPROVE, approve, DECIDE_SCHEMA),
+        (SERVICE_DENY, deny, DECIDE_SCHEMA),
     ):
         hass.services.async_register(
             DOMAIN, name, handler, schema=schema, supports_response=SupportsResponse.OPTIONAL
@@ -170,14 +314,18 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     return True
 
 
-def _now() -> str:
-    return dt_util.utcnow().isoformat()
-
-
 async def async_setup_entry(hass: HomeAssistant, entry: FamilyTasksConfigEntry) -> bool:
-    """Load the ledger and the sensors."""
+    """Load the ledger, the sensors and listen for "approve" / "deny" taps."""
     store: Store = Store(hass, STORAGE_VERSION, STORAGE_KEY)
     entry.runtime_data = FamilyTasksData(Ledger.from_dict(await store.async_load()), store)
+
+    async def _on_action(event: Event) -> None:
+        action = str(event.data.get("action", ""))
+        for prefix, yes in ((ACTION_APPROVE, True), (ACTION_DENY, False)):
+            if action.startswith(prefix):
+                await _decide(hass, entry, action.removeprefix(prefix), yes)
+
+    entry.async_on_unload(hass.bus.async_listen(EVENT_NOTIFICATION_ACTION, _on_action))
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     return True
 
