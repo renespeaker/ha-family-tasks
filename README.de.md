@@ -12,9 +12,8 @@ wenn eine Liste geleert wird, und Ämtli, die jede Runde wieder öffnen, können
 keine bekommen. Mit Family Tasks wird **jeder Punkt gebucht und bleibt**, und jede
 Person bekommt einen Punkte-Sensor.
 
-> **Stand: v0.2.0 – Punktekonto + Belohnungs-Freigabe per Push.** Zusammen mit
-> der Family Task Card ab v0.14.0 nutzen (`points_backend: true`). Als Nächstes
-> geplant: Statistik.
+> **Stand: v0.3.0 – Punktekonto, Belohnungs-Freigabe per Push, Statistik.**
+> Zusammen mit der Family Task Card ab v0.14.0 nutzen (`points_backend: true`).
 
 ## Was du bekommst
 
@@ -62,6 +61,21 @@ sich Anfragen trotzdem mit `family_tasks.approve` / `deny` entscheiden.
 
 Ereignisse für eigene Automationen: `family_tasks_reward_requested` und
 `family_tasks_reward_decided` (mit `approved: true/false`).
+
+## Statistik
+
+Jeder Punkte-Sensor zählt außerdem, in der Zeitzone von Home Assistant:
+
+| Attribut | Bedeutung |
+|---|---|
+| `week_points` / `week_tasks` | verdiente Punkte / erledigte Aufgaben diese Woche (ab Montag) |
+| `month_points` / `month_tasks` | dasselbe für den laufenden Monat |
+| `streak` | Tage am Stück mit mindestens einer Aufgabe, bis heute (oder gestern, bis zur ersten Aufgabe heute) |
+| `best_streak` | die bisher längste Serie |
+
+Die Werte schalten kurz nach Mitternacht von selbst weiter. Eine Aufgabe zählt an
+dem Tag, an dem sie gebucht wird – die Karte bucht eine Aufgabe, sobald sie sie
+abgehakt sieht.
 
 ## Installation
 
