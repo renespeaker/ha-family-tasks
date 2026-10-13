@@ -10,7 +10,9 @@ points sensor.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
@@ -23,7 +25,7 @@ from homeassistant.core import (
     SupportsResponse,
     callback,
 )
-from homeassistant.exceptions import ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.dispatcher import async_dispatcher_send
 from homeassistant.helpers.storage import Store
@@ -59,6 +61,8 @@ from .const import (
     STORAGE_VERSION,
 )
 from .ledger import InsufficientPoints, Ledger, Request
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS = [Platform.SENSOR]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
@@ -168,6 +172,23 @@ def _insufficient(person: str, err: InsufficientPoints, points: int) -> ServiceV
     )
 
 
+async def _notify_parents(
+    hass: HomeAssistant, entry: FamilyTasksConfigEntry, payload: dict[str, Any]
+) -> None:
+    """Send to every configured phone; one that is gone doesn't stop the others."""
+    for target in entry.options.get(CONF_NOTIFY, []):
+        if not hass.services.has_service("notify", target):
+            _LOGGER.warning(
+                "notify.%s not found - pick the parents' phones again in the Family Tasks options",
+                target,
+            )
+            continue
+        try:
+            await hass.services.async_call("notify", target, payload, blocking=False)
+        except (HomeAssistantError, vol.Invalid) as err:
+            _LOGGER.warning("Could not notify %s: %s", target, err)
+
+
 async def _push(hass: HomeAssistant, entry: FamilyTasksConfigEntry, req: Request) -> None:
     """Ask the parents: an actionable notification to every configured target."""
     text = PUSH_TEXT.get(hass.config.language.split("-")[0], PUSH_TEXT["en"])
@@ -185,19 +206,16 @@ async def _push(hass: HomeAssistant, entry: FamilyTasksConfigEntry, req: Request
             ],
         },
     }
-    for target in entry.options.get(CONF_NOTIFY, []):
-        await hass.services.async_call("notify", target, payload, blocking=False)
+    await _notify_parents(hass, entry, payload)
 
 
 async def _clear_push(hass: HomeAssistant, entry: FamilyTasksConfigEntry, request_id: str) -> None:
     """Remove the request's push from every parent's phone once it is decided."""
-    for target in entry.options.get(CONF_NOTIFY, []):
-        await hass.services.async_call(
-            "notify",
-            target,
-            {"message": "clear_notification", "data": {"tag": f"{DOMAIN}_{request_id}"}},
-            blocking=False,
-        )
+    await _notify_parents(
+        hass,
+        entry,
+        {"message": "clear_notification", "data": {"tag": f"{DOMAIN}_{request_id}"}},
+    )
 
 
 async def _decide(

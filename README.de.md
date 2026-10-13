@@ -12,7 +12,7 @@ wenn eine Liste geleert wird, und Ämtli, die jede Runde wieder öffnen, können
 keine bekommen. Mit Family Tasks wird **jeder Punkt gebucht und bleibt**, und jede
 Person bekommt einen Punkte-Sensor.
 
-> **Stand: v0.3.0 – Punktekonto, Belohnungs-Freigabe per Push, Statistik.**
+> **Stand: v0.3.1 – Punktekonto, Belohnungs-Freigabe per Push, Statistik.**
 > Zusammen mit der Family Task Card ab v0.14.0 nutzen (`points_backend: true`).
 
 ## Was du bekommst
