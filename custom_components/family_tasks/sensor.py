@@ -12,7 +12,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_change
 from homeassistant.util import dt as dt_util
 
-from . import FamilyTasksConfigEntry
+from . import FamilyTasksConfigEntry, _display_name
 from .const import DOMAIN, SIGNAL_UPDATED
 from .stats import person_stats
 
@@ -113,10 +113,3 @@ class PointsSensor(SensorEntity):
             "streak": st.streak,
             "best_streak": st.best_streak,
         }
-
-
-def _display_name(hass: HomeAssistant, person: str) -> str:
-    """Use the person entity's friendly name when the key is a person.*."""
-    if person.startswith("person.") and (state := hass.states.get(person)):
-        return str(state.attributes.get("friendly_name", person))
-    return person

@@ -3,6 +3,7 @@
 from typing import Any
 
 import pytest
+import voluptuous as vol
 from homeassistant.core import HomeAssistant
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.exceptions import ServiceValidationError
@@ -160,3 +161,16 @@ async def test_the_deny_button_on_the_phone_frees_the_points(hass: HomeAssistant
     await hass.async_block_till_done()
     st = _sensor(hass, "Lina")
     assert (st.state, st.attributes["redeemed"], st.attributes["pending"]) == ("30", 0, [])
+
+
+async def test_a_phone_that_is_gone_does_not_stop_requests(hass: HomeAssistant):
+    """Dad's old phone was removed: Mom still gets the push, deciding still works."""
+    mom = async_mock_service(hass, "notify", "mobile_app_mom")
+    # a notify service that only takes a plain message
+    async_mock_service(hass, "notify", "sms", schema=vol.Schema({vol.Required("message"): str}))
+    await _setup(hass, ["mobile_app_dads_old_phone", "sms", "mobile_app_mom"])
+    rid = await _lina_asks(hass)
+    assert len(mom) == 1
+    assert await _call(hass, "approve", request_id=rid) == {"decided": True}
+    assert mom[-1].data["message"] == "clear_notification"
+    assert _sensor(hass, "Lina").attributes["redeemed"] == 20
